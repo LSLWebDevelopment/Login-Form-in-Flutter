@@ -1,0 +1,191 @@
+main.dart:
+import 'package:flutter/material.dart';
+import 'src/app.dart';
+
+void main() {
+  runApp(App());
+}
+
+app.dart:
+import 'package:flutter/material.dart';
+import 'screens/login_screen.dart';
+import 'blocs/provider.dart';
+
+class App extends StatelessWidget {
+  const App({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Provider(
+      key: null,
+      child: MaterialApp(
+        title: 'Log Me In',
+        home: Scaffold(
+          body: LoginScreen(),
+        ),
+      ),
+    );
+  }
+}
+
+login_screen.dart: 
+import 'package:flutter/material.dart';
+import '../blocs/bloc.dart';
+import '../blocs/provider.dart';
+
+class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final bloc = Provider.of(context);
+
+    return Container(
+      margin: EdgeInsets.all(20.0),
+      child: Column(
+        children: [
+          emailField(bloc),
+          passwordField(bloc),
+          SizedBox(height: 16.0),
+          submitButton(bloc),
+        ],
+      ),
+    );
+  }
+
+  Widget emailField(Bloc bloc) {
+    return StreamBuilder(
+      stream: bloc.email,
+      builder: (context, snapshot) {
+        return TextField(
+          onChanged: bloc.changeEmail,
+          keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            hintText: 'you@example.com',
+            labelText: 'Email Address',
+            errorText: snapshot.hasError ? snapshot.error.toString() : null,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget passwordField(Bloc bloc) {
+    return StreamBuilder(
+      stream: bloc.password,
+      builder: (context, snapshot) {
+        return TextField(
+          onChanged: bloc.changePassword,
+          obscureText: true,
+          decoration: InputDecoration(
+            hintText: 'Password',
+            labelText: 'Password',
+            errorText: snapshot.hasError ? snapshot.error.toString() : null,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget submitButton(Bloc bloc) {
+    return StreamBuilder(
+      stream: bloc.submitValue,
+      builder: (context, snapshot) {
+        return ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+          ),
+          onPressed: snapshot.hasData ? bloc.submit : null,
+          child: Text(
+            'Login',
+            style: TextStyle(
+              fontSize: 20.0,
+              fontWeight: FontWeight(500),
+              color: Colors.white,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+provider.dart:
+import 'package:flutter/material.dart';
+import 'bloc.dart';
+
+class Provider extends InheritedWidget {
+  Provider({required super.key, required super.child});
+
+  final bloc = Bloc();
+
+  @override
+  bool updateShouldNotify(covariant InheritedWidget oldWidget) {
+    return true;
+  }
+
+  static Bloc of(BuildContext context) {
+    return (context.dependOnInheritedWidgetOfExactType<Provider>() as Provider)
+        .bloc;
+  }
+}
+
+bloc.dart:
+import 'dart:async';
+import 'validators.dart';
+import 'package:rxdart/rxdart.dart';
+
+class Bloc with Validators {
+  final _emailConttler = BehaviorSubject<String>();
+  final _passwordConttler = BehaviorSubject<String>();
+
+  // Add data to stream
+  Stream<String> get email => _emailConttler.stream.transform(validateEmail);
+  Stream<String> get password =>
+      _passwordConttler.stream.transform(validatePassword);
+  Stream<bool> get submitValue =>
+      Rx.combineLatest2(email, password, (e, p) => true);
+
+  // Change data
+  Function(String) get changeEmail => _emailConttler.sink.add;
+  Function(String) get changePassword => _passwordConttler.sink.add;
+
+  submit() {
+    final validEmail = _emailConttler.value;
+    final validPassword = _passwordConttler.value;
+
+    print('Email is $validEmail');
+    print('Password is $validPassword');
+  }
+
+  void dispose() {
+    _emailConttler.close();
+    _passwordConttler.close();
+  }
+}
+
+validator.dart:
+import 'dart:async';
+
+mixin Validators {
+  final validateEmail = StreamTransformer<String, String>.fromHandlers(
+    handleData: (email, sink) {
+      if (email.contains('@')) {
+        sink.add(email);
+      } else {
+        sink.addError('Enter a valid email');
+      }
+    },
+  );
+
+  final validatePassword = StreamTransformer<String, String>.fromHandlers(
+    handleData: (password, sink) {
+      if (password.length >= 8) {
+        sink.add(password);
+      } else {
+        sink.addError('Password must be at least 8 characters');
+      }
+    },
+  );
+}
+
